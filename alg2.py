@@ -1,11 +1,16 @@
 from typing import List
 
 
-def nested_sum_of_polynomial(a: int, b: int, k: int, f_coefs: List[float]) -> float:
+def nested_sum_of_polynomial(
+    a: int,
+    b: int,
+    k: int,
+    f_coefs: List[float],
+) -> float:
     mem = {}
 
     def func(x: int) -> int:
-        # horner's method for polynomial evaluation
+        # Horner's method for polynomial evaluation
         acc = f_coefs[-1]
         for coef in f_coefs[-2::-1]:
             acc *= x
@@ -25,11 +30,11 @@ def nested_sum_of_polynomial(a: int, b: int, k: int, f_coefs: List[float]) -> fl
     return recursive_sum(b, k)
 
 
-result = nested_sum_of_polynomial(
-    a=1,
-    b=100,
-    k=4,
-    f_coefs=[5, -1, 1, -5, -3, 3],  # Put your function coefficients here
-)
+# result = nested_sum_of_polynomial(
+#     a=1,
+#     b=100,
+#     k=4,
+#     f_coefs=[5, -1, 1, -5, -3, 3],  # Put your function coefficients here
+# )
 
-print(int(result))
+# print(int(result))

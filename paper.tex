@@ -46,11 +46,10 @@
     language=Python
 }
 %--------------------------------------
-% Uncomment the following line to allow the usage of graphics (.png, .jpg)
-%\usepackage{graphicx}
+\usepackage{graphicx}
 \title{Faster approach to evaluate nested sums of polynomials}
 \author{Pedro Cleto \\ \href{mailto:cl3t0.sh@gmail.com}{cl3t0.sh@gmail.com} }
-\date{January 2020}
+\date{March 2024}
 
 % Start the document
 \begin{document}
@@ -63,30 +62,33 @@
 
 \section{Abstract}
 
-In this paper we show 3 algorithms to evaluate nested sums of polynomials. The last one is the main work of this paper. Define $f$ and $S$ as
+In this paper, we show 4 algorithms to evaluate nested sums of polynomials. The last two are the main work of this paper. Define $f$ and $S$ as
 
 \begin{align*}
     f(x)       & := a_0 + a_1 x + a_2 x^2 + \cdots + a_n x^n                               \\
     S(a, b, k) & := \sum_{i_1=a}^{b}\sum_{i_2=a}^{i_1}\cdots\sum_{i_k=a}^{i_{k-1}} f(i_k).
 \end{align*}
 
-The first algorithm consists in evaluate in a naive way, applying summations using recursion. Let's call it "Naive sum". The second one is what probably most of the people thought to use because it's not hard to think and hugely optimizes running time and depends almost equally on $b - a$, $k$ and $n$. Let's call it "Memoized sum". Finally, the third algorithm uses binomial coefficients and matrices operations to depends mostly on $n$. It means that this algorithm is faster for bigger $k$ and $b - a$. Let's call it BCBTS (Binomial Coefficients Base Transformation Sum).
+The first algorithm consists of evaluating in a naive way, applying summations using recursion. Let's call it "Naive sum". The second one uses memoization and is what probably most people thought to use because it's not hard to think and it hugely optimizes running time and depends almost equally on $b - a$, $k$, and $n$. Let's call it "Memoized sum". The third algorithm transforms the summations into a single summation using binomial coefficients so the running time does not depend on $k$. Let's call it "BCS" (Binomial Coefficients Sum). Finally, the fourth algorithm exploits the fact that $f$ is polynomial and uses binomial coefficients and matrices operations to depend mostly on $n$. It means that this algorithm is faster for bigger $k$ and $b - a$ and small $n$. Let's call it "BCBTS" (Binomial Coefficients Base Transformation Sum).
 
 \section{Algorithm 1: Naive Sum}
 
 \subsection{Code and complexity analysis}
 
-The algorithm is brute force so it doesn't require proof. Python is not the fastest programming language but we are using it only for comparation purposes and to avoid float precision problems.
-
-\pagebreak
+The algorithm is brute force so it doesn't require proof. Python is not the fastest programming language but we are using it only for comparison purposes and to avoid float precision problems.
 
 \begin{lstlisting}[style=Python]
 from typing import List
 
 
-def nested_sum_of_polynomial(a: int, b: int, k: int, f_coefs: List[float]) -> float:
+def nested_sum_of_polynomial(
+    a: int,
+    b: int,
+    k: int,
+    f_coefs: List[float],
+) -> float:
     def func(x: int) -> int:
-        # horner's method for polynomial evaluation
+        # Horner's method for polynomial evaluation
         acc = f_coefs[-1]
         for coef in f_coefs[-2::-1]:
             acc *= x
@@ -109,11 +111,11 @@ result = nested_sum_of_polynomial(
     f_coefs=[5, -1, 1, -5, -3, 3],  # Put your function coefficients here
 )
 
-print(result)    
+print(result)
 
 \end{lstlisting}
 
-Note that it's a simple and short code but extremely inefficient due to function recursion. Doing some analysis we conclude that the time complexity of this algorithm is $O\Big(n \binom{b-a+k-1}{k}\Big)$ given $a, b, k, n$. It's not precise because Python don't do exactly what we order. Because of it we are going to do some pratical comparison at the end.
+Note that it's a simple and short code but extremely inefficient due to function recursion. Doing some analysis we conclude that the time complexity of this algorithm is $O\Big(n \binom{b-a+k-1}{k}\Big)$ given $a, b, k, n$. It's not precise because Python doesn't do exactly what we order. Because of this, we are going to do some practical comparisons at the end.
 
 \section{Algorithm 2: Memoized Sum}
 
@@ -125,11 +127,16 @@ Here we are going to rewrite the same algorithm as before but with memoization.
 from typing import List
 
 
-def nested_sum_of_polynomial(a: int, b: int, k: int, f_coefs: List[float]) -> float:
+def nested_sum_of_polynomial(
+    a: int,
+    b: int,
+    k: int,
+    f_coefs: List[float],
+) -> float:
     mem = {}
 
     def func(x: int) -> int:
-        # horner's method for polynomial evaluation
+        # Horner's method for polynomial evaluation
         acc = f_coefs[-1]
         for coef in f_coefs[-2::-1]:
             acc *= x
@@ -156,87 +163,51 @@ result = nested_sum_of_polynomial(
     f_coefs=[5, -1, 1, -5, -3, 3],  # Put your function coefficients here
 )
 
-print(result)
+print(int(result))
     
 \end{lstlisting}
 
-This simple technique drastically speed things up. Doing some analysis we conclude that the time complexity of this algorithm is $O\Big((b - a)(n + k)\Big)$ given $a, b, k, n$. Again, it's not precise.
+This simple technique drastically speeds things up. Doing some analysis we conclude that the time complexity of this algorithm is $O\Big((b - a)(n + k)\Big)$ given $a, b, k, n$. Again, it's not precise.
 
-\section{Algorithm 3: BCBTS (Binomial Coefficients Base Transformation Sum)}
+\section{Algorithm 3: BCS (Binomial Coefficients Sum)}
 
 \subsection{Presentation}
 
-BCBTS consists in rewriting $S$ through binomial coefficients.
+BCS consists of representing nested sums as binomial coefficients. Its calculation is super simple.
 
 $$
-    S(a, b, k) = \begin{bmatrix}
-        \binom{b+k-a}{k} & \binom{b+1+k-a}{1+k} & \cdots & \binom{b+n+k-a}{n+k}
-    \end{bmatrix} \Omega
-    \begin{bmatrix}
-        a_0 \\ a_1 \\ \vdots \\ a_n
-    \end{bmatrix}
+    S(a, b, k) = \sum_{i=a}^{b} f(i) \binom{b + k - 1 - i}{k - 1}
 $$
-
-where $\Omega$ is an $(n+1) \times (n+1)$ upper triangular matrix defined by the recurrence
-
-
-\begin{itemize}
-    \item $\Omega_{1, 1} := 1$;
-    \item For all $i, j \in \mathbb{Z_+}$ where  $j < i \leq n+1$, $\Omega_{i, j} := 0$; \hfill (upper triangular matrix)
-    \item For all $i, j \in \mathbb{N}$ where $i, j \leq n$, $\Omega_{i+1, j+1} :=  \Omega_{i, j} i - \Omega_{i+1, j} (i+1-a)$.
-\end{itemize}
-
-For example, when $a = 1$ we get
-
-$$
-    \Omega =
-    \begin{bmatrix}
-        1      & 0      & 0      & 0      & 0      & 0      & \cdots \\
-        0      & 1      & -1     & 1      & -1     & 1      & \cdots \\
-        0      & 0      & 2      & -6     & 14     & -30    & \cdots \\
-        0      & 0      & 0      & 6      & -36    & 150    & \cdots \\
-        0      & 0      & 0      & 0      & 24     & -240   & \cdots \\
-        0      & 0      & 0      & 0      & 0      & 120    & \cdots \\
-        \vdots & \vdots & \vdots & \vdots & \vdots & \vdots & \ddots
-    \end{bmatrix}.
-$$
-
-\vspace{20px}
 
 \subsection{Code and complexity analysis}
 
+Note that we can calculate binomial coefficients based on the last coefficient used to reuse computation.
+
 \begin{lstlisting}[style=Python]
-import numpy as np
 from typing import List
 
 
-def nested_sum_of_polynomial(a: int, b: int, k: int, f_coefs: List[float]) -> float:
-    n = len(f_coefs) - 1
-    coefs_vec = np.array([0, *f_coefs]).reshape(-1, 1)
+def nested_sum_of_polynomial(
+    a: int,
+    b: int,
+    k: int,
+    f_coefs: List[float],
+) -> float:
 
-    # calculating pascal triangle elements
-    last_val = 1  # (b + k - a choose 0)
-    for i in range(k):
-        last_val *= (b + k - a - i) / (i + 1)
+    def func(x: int) -> int:
+        # Horner's method for polynomial evaluation
+        acc = f_coefs[-1]
+        for coef in f_coefs[-2::-1]:
+            acc *= x
+            acc += coef
+        return acc
 
-    # calculating base vector values
-    base = [0, last_val]
-    # (b + k - a choose k)
-    for i in range(2, n + 2):
-        base.append(base[i - 1] * (b + k + i - 1 - a) / (k + i - 1))
-    base_vec = np.array(base).reshape(1, -1)
-
-    # initializing omega matrix
-    omega = np.zeros(shape=(n + 2, n + 2))
-    omega[1, 1] = 1
-
-    # calculating omega matrix
-    for j in range(2, n + 2):
-        for i in range(1, j + 1):
-            omega[i, j] = (i - 1) * omega[i - 1, j - 1] - (i - a) * omega[i, j - 1]
-
-    result = np.linalg.multi_dot([base_vec, omega, coefs_vec])
-    return result[0, 0]
+    pascal = 1  # (k - 1 choose k - 1)
+    res = 0
+    for i in range(a, b + 1):
+        res += pascal * func(a + b - i)
+        pascal *= (k + i - a) / (i - a + 1)
+    return res
 
 
 result = nested_sum_of_polynomial(
@@ -246,15 +217,14 @@ result = nested_sum_of_polynomial(
     f_coefs=[5, -1, 1, -5, -3, 3],  # Put your function coefficients here
 )
 
-print(int(result))
-    
+print(int(result)) 
 \end{lstlisting}
 
-This time it is possible to notice a more extensive code and more operations than algorithm 2 for small $k$ and $b$. Doing some analysis we conclude that the time complexity of this algorithm is $O\Big(k + n^2\Big)$ given $a, b, k, n$. It means that it does not depends on $b$ and $a$ and depends linearly on $k$. This algorithm seems ideal for small $n$, big $k$ and arbitrarily large $b - a$.
+The code is simple and extremely efficient. After analysis, we know that the time complexity of this algorithm is $O\Big(n (b - a)\Big)$ given $a, b, k, n$. You are not seeing it wrong. This algorithm does \textbf{not} depend on $k$ and is linear on $n$ and $b-a$. BCS is fast enough for most cases, but we are not going to stop here. Before presenting the next algorithm, let's prove BCS works.
 
 \subsection{Proof}
 
-In order to represent summations in an alternative way we need to show some intermediate results.
+First, we need some auxiliary results.
 
 \begin{theorem}[Pascal's rule]
     \label{pascal_rule}
@@ -339,6 +309,125 @@ In order to represent summations in an alternative way we need to show some inte
     Therefore, it holds for $b + 1$. By the principle of finite induction, it holds for all $b \in \mathbb{N}$ where $b \geq a$.
 
 \end{proof}
+
+Now we are going to show that BCS works for $k = 1$.
+
+\begin{align*}
+    S(a, b, 1) & = \sum_{i = a}^{b} f(i) \\
+    & = \sum_{i = a}^{b} f(i) \binom{b + 1 - 1 - i}{1 - 1}.
+\end{align*}
+
+Suppose that BCS works for some $k \in \mathbb{Z}_{+}$.
+
+\begin{align*}
+    S(a, b, k) & = \sum_{i = a}^{b} f(i) \binom{b + k - 1 - i}{k - 1} \\
+    \sum_{j=a}^{b} S(a, j, k) & = \sum_{j=a}^{b} \sum_{i = a}^{j} f(i) \binom{j + k - 1 - i}{k - 1} \\
+    S(a, b, k + 1) & = \sum_{i=a}^{b} f(i) \sum_{j = i}^{b} \binom{j + k - 1 - i}{k - 1}.
+\end{align*}
+
+By the theorem \ref{hockey_stick_identity} we have
+
+$$
+    \boxed{S(a, b, k + 1) = \sum_{i=a}^{b} f(i) \binom{b + k - i}{k}}.
+$$
+
+Therefore, BCS works for $k + 1$. By the principle of finite induction, BCS works for all $k \in \mathbb{Z}_{+}$.
+
+$\hfill\blacksquare$
+
+\section{Algorithm 4: BCBTS (Binomial Coefficients Base Transformation Sum)}
+
+\subsection{Presentation}
+
+BCBTS consists of rewriting $S$ through binomial coefficients.
+
+$$
+    S(a, b, k) = \begin{bmatrix}
+        \binom{b+k-a}{k} & \binom{b+1+k-a}{1+k} & \cdots & \binom{b+n+k-a}{n+k}
+    \end{bmatrix} \Omega
+    \begin{bmatrix}
+        a_0 \\ a_1 \\ \vdots \\ a_n
+    \end{bmatrix}
+$$
+
+where $\Omega$ is an $(n+1) \times (n+1)$ upper triangular matrix defined by the recurrence
+
+
+\begin{itemize}
+    \item $\Omega_{1, 1} := 1$;
+    \item For all $i, j \in \mathbb{Z_+}$ where  $j < i \leq n+1$, $\Omega_{i, j} := 0$; \hfill (upper triangular matrix)
+    \item For all $i, j \in \mathbb{N}$ where $i, j \leq n$, $\Omega_{i+1, j+1} :=  \Omega_{i, j} i - \Omega_{i+1, j} (i+1-a)$.
+\end{itemize}
+
+For example, when $a = 1$ we get
+
+$$
+    \Omega =
+    \begin{bmatrix}
+        1      & 0      & 0      & 0      & 0      & 0      & \cdots \\
+        0      & 1      & -1     & 1      & -1     & 1      & \cdots \\
+        0      & 0      & 2      & -6     & 14     & -30    & \cdots \\
+        0      & 0      & 0      & 6      & -36    & 150    & \cdots \\
+        0      & 0      & 0      & 0      & 24     & -240   & \cdots \\
+        0      & 0      & 0      & 0      & 0      & 120    & \cdots \\
+        \vdots & \vdots & \vdots & \vdots & \vdots & \vdots & \ddots
+    \end{bmatrix}.
+$$
+
+\vspace{20px}
+
+\subsection{Code and complexity analysis}
+
+\begin{lstlisting}[style=Python]
+import numpy as np
+from typing import List
+
+
+def nested_sum_of_polynomial(a: int, b: int, k: int, f_coefs: List[float]) -> float:
+    n = len(f_coefs) - 1
+    coefs_vec = np.array([0, *f_coefs]).reshape(-1, 1)
+
+    # calculating pascal triangle elements
+    last_val = 1  # (b + k - a choose 0)
+    for i in range(k):
+        last_val *= (b + k - a - i) / (i + 1)
+
+    # calculating base vector values
+    base = [0, last_val]
+    # (b + k - a choose k)
+    for i in range(2, n + 2):
+        base.append(base[i - 1] * (b + k + i - 1 - a) / (k + i - 1))
+    base_vec = np.array(base).reshape(1, -1)
+
+    # initializing omega matrix
+    omega = np.zeros(shape=(n + 2, n + 2))
+    omega[1, 1] = 1
+
+    # calculating omega matrix
+    for j in range(2, n + 2):
+        for i in range(1, j + 1):
+            omega[i, j] = (i - 1) * omega[i - 1, j - 1] - (i - a) * omega[i, j - 1]
+
+    result = np.linalg.multi_dot([base_vec, omega, coefs_vec])
+    return result[0, 0]
+
+
+result = nested_sum_of_polynomial(
+    a=1,
+    b=100,
+    k=4,
+    f_coefs=[5, -1, 1, -5, -3, 3],  # Put your function coefficients here
+)
+
+print(int(result))
+    
+\end{lstlisting}
+
+This time it is possible to notice a more extensive code and more operations than algorithm 2 for small $k$ and $b$. Doing some analysis we conclude that the time complexity of this algorithm is $O\Big(k + n^2\Big)$ given $a, b, k, n$. It means that it does not depend on $b$ and $a$ and depends linearly on $k$. This algorithm seems ideal for small $n$, big $k$, and arbitrarily large $b - a$.
+
+\subsection{Proof}
+
+To represent summations in an alternative way we need to show some intermediate results.
 
 \vspace{20px}
 
@@ -628,13 +717,7 @@ To calculate $S(a, b, k)$ we apply the definition and we get
                   \end{bmatrix}.
 \end{align*}
 
-Note that when we these products, we get a linear combination of binomial coefficients and will be possible to apply the theorem \ref{expanded_hockey_stick_identity}, getting
-
-%Eita porra, que salto!
-
-%Sugestão: Coloca pelo menos que $\sum_X X\Omega A$ pode ser fatorado como $(\sum_X X) \Omega A$ e, aí sim, que esse somatorio é simplificado pelo teorema das colunas expandido.
-
-%nao entendi, bora ver isso quando nos vermos
+Note that when we these products, we get a linear combination of binomial coefficients, and will be possible to apply the theorem \ref{expanded_hockey_stick_identity}, getting
 
 $$
     S(a, b, k) = \begin{bmatrix}
@@ -643,6 +726,8 @@ $$
         \omega_0 \\ \omega_1 \\ \omega_2 \\ \vdots \\ \omega_n
     \end{bmatrix}.
 $$
+
+\pagebreak
 
 Substituting the vector of coefficients $\omega$ we get
 
@@ -659,41 +744,49 @@ $\hfill\blacksquare$
 
 \vspace{20px}
 
-\section{Análise de eficiência}
-\label{analise_de_eficiencia}
+\section{Efficiency analysis}
+\label{efficiency_analysis}
 
-Agora iremos fazer testes utilizando os algoritmos 1, 2 e 3 apresentados neste artigo.  Essa diferença é tão grande que para $(a, b, k, n) = (1, 100, 6, 5)$ obtemos as seguintes medições de tempo.
+Now we are going to test all presented algorithms. The results were obtained by running on an i5-7200U. You can reproduce all tests using the Python files available \href[]{https://github.com/cl3t0/nested-sums-of-polynomials}{here}.
 
-\begin{center}
-    \begin{tabular}{ |c|c|c| }
-        \hline
-        Algoritmo & Tempo de execução \\
-        \hline
-        1         & 16,472 segundos   \\
-        2         & 0,007 segundos    \\
-        3         & 0,007 segundos    \\
-        \hline
-    \end{tabular}
-\end{center}
+\subsection{Excluding Naive Sum}
 
-Aumentando apenas uma unidade em $k$ ($k = 7$) obtém-se as seguintes medições.
+We just showed the Naive Sum for completeness purposes. In practice, it's almost useless for all cases due to recursion issues. The following picture was produced using $a = 1, b = 100$, and $f(x) = 5-x+x^2-5x^3-3x^4+3x^5$.
 
 \begin{center}
-    \begin{tabular}{ |c|c|c| }
-        \hline
-        Algoritmo & Tempo de execução \\
-        \hline
-        1         & 240,762 segundos  \\
-        2         & 0,007 segundos    \\
-        3         & 0,007 segundos    \\
-        \hline
-    \end{tabular}
+    \includegraphics[scale=.7]{assets/1.png}    
 \end{center}
 
-(Nessa parte ainda não terminei todas as comparações que quero fazer)
+\subsection{Excluding Memoized Sum}
 
-\section{Conclusão}
+Memoized Sum is very fast but it's intrinsically slower than BCS because BCS does not depend on $k$. Take a look at the same picture but for bigger $k$ and excluding the Naive Sum.
 
-Depois da demonstração matemática e das comparações de eficiência foi possível conhecer um algoritmo extremamente mais eficiente para o cálculo de somatórios recursivos, ganhando uma grande quantidade de tempo.
+\begin{center}
+    \includegraphics[scale=.8]{assets/2.png}
+\end{center}
+
+Note that Memoized Sum running time grows linearly with $k$ as expected.
+
+\subsection{Big people fight: BCS vs BCBTS}
+
+When talking about $k$, BCS takes the advantage because it does not depend on $k$. The following picture shows it.
+
+\includegraphics[scale=1]{assets/3.png}
+
+However, BCBTS is faster when $b-a$ is big enough and $n$ small enough. That's why when talking about $b-a$, BCBTS is \textbf{absolutely} faster.
+
+\begin{center}
+    \includegraphics[scale=.7]{assets/4.png}
+\end{center}
+
+Note that BCS running time grows linearly with $b-a$, while BCBTS does not depend on $b-a$, as expected.
+
+\section{Conclusion}
+
+After demonstrations and speed comparisons, we conclude that BCS and BCBTS are super-fast algorithms that can improve significantly the calculation of nested sums of polynomials.
+
+\vspace{10px}
+
+BCS works for any function and does not depend on $k$. It's awesome! But if we are talking about polynomials, BCBTS is better for most cases. The only exception is if $b-a$ is small, $k$ is big and $n$ is big.
 
 \end{document}
